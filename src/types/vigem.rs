@@ -5,7 +5,7 @@ use crate::types::button::Reportable;
 use std::rc::Rc;
 
 pub struct Vigem {
-    pub vigem: Rc<Box<PVIGEM_CLIENT>>,
+    pub vigem: Rc<PVIGEM_CLIENT>,
     drop: bool,
 }
 
@@ -14,7 +14,7 @@ impl Vigem {
     pub fn new() -> Self {
         let vigem = unsafe { vigem_alloc() };
         Self {
-            vigem: Rc::new(Box::new(vigem)),
+            vigem: Rc::new(vigem),
             drop: true,
         }
     }
@@ -22,14 +22,14 @@ impl Vigem {
     /// You can build safe `Vigem` abstraction from `PVIGEM_CLIENT`, which you can obtain from notifications
     pub fn from_raw(vigem: PVIGEM_CLIENT) -> Self {
         Self {
-            vigem: Rc::new(Box::new(vigem)),
+            vigem: Rc::new(vigem),
             drop: false,
         }
     }
     /// Initializes the driver object and establishes a connection to the emulation bus driver. Returns an error if no compatible bus device has been found.
     pub fn connect(&mut self) -> Result<(), VigemError> {
         unsafe {
-            let err = vigem_connect(**self.vigem);
+            let err = vigem_connect(*self.vigem);
             VigemError::new(err).to_result()
         }
     }
@@ -38,7 +38,7 @@ impl Vigem {
     pub fn target_add(&mut self, target: &mut Target) -> Result<(), VigemError> {
         unsafe {
             target.set_client(self.vigem.clone());
-            let err = vigem_target_add(**self.vigem, *target.raw);
+            let err = vigem_target_add(*self.vigem, target.raw);
             VigemError::new(err).to_result()
         }
     }
@@ -50,7 +50,7 @@ impl Vigem {
         func: PFN_VIGEM_TARGET_ADD_RESULT,
     ) -> Result<(), VigemError> {
         unsafe {
-            let err = vigem_target_add_async(**self.vigem, *target.raw, func);
+            let err = vigem_target_add_async(*self.vigem, target.raw, func);
             VigemError::new(err).to_result()
         }
     }
@@ -58,7 +58,7 @@ impl Vigem {
     /// Removes a provided target device from the bus driver, which is equal to a device unplug event of a physical hardware device. The target device object may be reused
     pub fn target_remove(&mut self, target: &Target) -> Result<(), VigemError> {
         unsafe {
-            let err = vigem_target_remove(**self.vigem, *target.raw);
+            let err = vigem_target_remove(*self.vigem, target.raw);
             VigemError::new(err).to_result()
         }
     }
@@ -66,14 +66,14 @@ impl Vigem {
     /// Free Vigem object, dont forget to remove all targets!
     pub fn free(&mut self) {
         unsafe {
-            vigem_free(**self.vigem);
+            vigem_free(*self.vigem);
         }
     }
 
     /// Disconnect from the BUS driver
     pub fn disconnect(&mut self) {
         unsafe {
-            vigem_disconnect(**self.vigem);
+            vigem_disconnect(*self.vigem);
         }
     }
 
@@ -82,7 +82,7 @@ impl Vigem {
         unsafe {
             let mut index = 0u32;
             let index_ptr: *mut u32 = &mut index;
-            vigem_target_x360_get_user_index(**self.vigem, *target.raw, index_ptr);
+            vigem_target_x360_get_user_index(*self.vigem, target.raw, index_ptr);
             return index;
         }
     }
@@ -95,8 +95,8 @@ impl Vigem {
     pub fn update<T: Reportable>(&mut self, target: &Target, report: &T) -> Result<(), VigemError>{
         unsafe{
             let err = match target.get_type() {
-                TargetType::Xbox360 => vigem_target_x360_update(**self.vigem, *target.raw, report.to_xusb().unwrap().to_raw()),
-                TargetType::DualShock4 => vigem_target_ds4_update(**self.vigem, *target.raw, report.to_ds().unwrap().to_raw())
+                TargetType::Xbox360 => vigem_target_x360_update(*self.vigem, target.raw, report.to_xusb().unwrap().to_raw()),
+                TargetType::DualShock4 => vigem_target_ds4_update(*self.vigem, target.raw, report.to_ds().unwrap().to_raw())
             };
             VigemError::new(err).to_result()
         }
@@ -112,8 +112,8 @@ impl Vigem {
         unsafe {
             let data_ptr: *mut T = &mut data;
             let err = vigem_target_x360_register_notification(
-                **self.vigem,
-                *target.raw,
+                *self.vigem,
+                target.raw,
                 func,
                 data_ptr.cast(),
             );
@@ -131,8 +131,8 @@ impl Vigem {
         unsafe {
             let data_ptr = data as *mut i32;
             let err = vigem_target_ds4_register_notification(
-                **self.vigem,
-                *target.raw,
+                *self.vigem,
+                target.raw,
                 func,
                 data_ptr.cast(),
             );
@@ -214,12 +214,4 @@ impl std::fmt::Display for VigemError {
     }
 }
 
-impl std::error::Error for VigemError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        if self.is_err() {
-            return Some(self);
-        } else {
-            return None;
-        }
-    }
-}
+impl std::error::Error for VigemError {}

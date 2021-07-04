@@ -1,2 +1,3 @@
+# Cargo
 /target
-/vigem-sys/target
+Cargo.lock

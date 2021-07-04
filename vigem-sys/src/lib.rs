@@ -3,5 +3,5 @@
 #![allow(non_snake_case)]
 #![allow(dead_code)]
 
-pub mod binds;
+mod binds;
 pub use binds::*;

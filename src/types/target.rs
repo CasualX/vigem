@@ -6,9 +6,9 @@ use std::rc::Rc;
 /// Note: If you use from_raw, dont forget to manually call `target.free()` or you will die
 #[derive(Debug)]
 pub struct Target {
-    pub raw: Box<PVIGEM_TARGET>,
+    pub raw: PVIGEM_TARGET,
     drop: bool,
-    client: Option<Rc<Box<PVIGEM_CLIENT>>>
+    client: Option<Rc<PVIGEM_CLIENT>>
 }
 
 impl Target {
@@ -22,58 +22,58 @@ impl Target {
         }
 
         Self {
-            raw: Box::new(raw),
+            raw: raw,
             drop: true,
             client: None
         }
     }
 
-    pub(crate) fn set_client(&mut self, client: std::rc::Rc<Box<PVIGEM_CLIENT>>){
+    pub(crate) fn set_client(&mut self, client: std::rc::Rc<PVIGEM_CLIENT>){
         self.client = Some(client);
     }
 
     /// Make safe abstraction over `PVIGEM_TARGET`, use when you get notification
     pub fn from_raw(target: PVIGEM_TARGET, client: PVIGEM_CLIENT) -> Self {
-        let client = Some(Rc::new(Box::new(client)));
+        let client = Some(Rc::new(client));
         Self {
-            raw: Box::new(target),
+            raw: target,
             drop: false,
             client
         }
     }
 
     pub fn size(&self) -> u32 {
-        unsafe { (*(*self.raw)).Size }
+        unsafe { (*self.raw).Size }
     }
 
     pub fn serial_no(&self) -> u32 {
-        unsafe { (*(*self.raw)).SerialNo }
+        unsafe { (*self.raw).SerialNo }
     }
 
     pub fn state(&self) -> TargetState {
-        unsafe { TargetState::new((*(*self.raw)).State) }
+        unsafe { TargetState::new((*self.raw).State) }
     }
 
     pub fn get_vid(&self) -> u16 {
-        unsafe { (*(*self.raw)).VendorId }
+        unsafe { (*self.raw).VendorId }
     }
     pub fn get_pid(&self) -> u16 {
-        unsafe { (*(*self.raw)).ProductId }
+        unsafe { (*self.raw).ProductId }
     }
 
     pub fn get_type(&self) -> TargetType {
-        unsafe { TargetType::new((*(*self.raw)).Type) }
+        unsafe { TargetType::new((*self.raw).Type) }
     }
 
     pub fn closing_notification_threads(&self) -> bool {
-        unsafe { (*(*self.raw)).closingNotificationThreads }
+        unsafe { (*self.raw).closingNotificationThreads }
     }
 
     // ! Userdata can be another type and value
     /// Get target userdata(as for now, it works pretty shitty)
     pub fn user_data<T: Sized>(&self) -> Option<&T> {
         unsafe {
-            let data: *mut T = (*(*(self.raw))).NotificationUserData.cast();
+            let data: *mut T = (*self.raw).NotificationUserData.cast();
             if data.is_null() {
                 None
             } else {
@@ -84,17 +84,14 @@ impl Target {
  
     pub fn index(&self) -> u32 {
         unsafe {
-            let index = vigem_target_get_index(*self.raw);
+            let index = vigem_target_get_index(self.raw);
             return index;
         }
     }
 
     pub fn is_attached(&self) -> bool {
         unsafe {
-            match vigem_target_is_attached(*self.raw) {
-                1 => true,
-                _ => false,
-            }
+            vigem_target_is_attached(self.raw) != 0
         }
     }
 
@@ -117,11 +114,11 @@ impl Target {
     /// ```
     pub fn update<T: Reportable>(&mut self, report: &T) -> Result<(), VigemError>{
         unsafe{
-            let client = ***(self.client.as_ref().unwrap());
+            let client = **(self.client.as_ref().unwrap());
 
             let err = match self.get_type() {
-                TargetType::Xbox360 => vigem_target_x360_update(client, *self.raw, report.to_xusb().unwrap().to_raw()),
-                TargetType::DualShock4 => vigem_target_ds4_update(client, *self.raw, report.to_ds().unwrap().to_raw())
+                TargetType::Xbox360 => vigem_target_x360_update(client, self.raw, report.to_xusb().unwrap().to_raw()),
+                TargetType::DualShock4 => vigem_target_ds4_update(client, self.raw, report.to_ds().unwrap().to_raw())
             };
             VigemError::new(err).to_result()
         }
@@ -130,27 +127,27 @@ impl Target {
     pub fn unregister_notification(&self) {
         unsafe {
             match self.get_type() {
-                TargetType::Xbox360 => vigem_target_x360_unregister_notification(*self.raw),
-                TargetType::DualShock4 => vigem_target_ds4_unregister_notification(*self.raw),
+                TargetType::Xbox360 => vigem_target_x360_unregister_notification(self.raw),
+                TargetType::DualShock4 => vigem_target_ds4_unregister_notification(self.raw),
             }
         }
     }
 
     pub fn set_vid(&self, vid: u16) {
         unsafe {
-            vigem_target_set_vid(*self.raw, vid);
+            vigem_target_set_vid(self.raw, vid);
         }
     }
 
     pub fn set_pid(&self, pid: u16) {
         unsafe {
-            vigem_target_set_pid(*self.raw, pid);
+            vigem_target_set_pid(self.raw, pid);
         }
     }
 
     pub fn free(&mut self) {
         unsafe {
-            vigem_target_free(*self.raw);
+            vigem_target_free(self.raw);
         }
     }
 }
@@ -159,8 +156,10 @@ impl Drop for Target {
     /// Always drop a target - we are good boys
     fn drop(&mut self) {
         if self.drop {
-            unsafe{vigem_target_remove(***(self.client.as_ref().unwrap()), *self.raw);} // Triple deferencing - that's why I love Rust!
-            self.free();
+            unsafe {
+                vigem_target_remove(**(self.client.as_ref().unwrap()), self.raw);
+                vigem_target_free(self.raw);
+            }
         }
     }
 }

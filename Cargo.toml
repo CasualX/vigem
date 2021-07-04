@@ -1,6 +1,9 @@
+[workspace]
+members = [".", "./vigem-sys"]
+
 [package]
 name = "vigem"
-version = "0.9.2"
+version = "0.9.3"
 authors = ["Sergey Duck <sergeypechnikov326@gmail.com>"]
 edition = "2018"
 description = "Safe Rust bindings for ViGEm"
@@ -12,11 +15,10 @@ exclude = ["target", "src/binds/*.h", "src/binds/*.cpp", "examples", "gamepad.pn
 
 [dependencies]
 bitflags = "1.2.1"
-vigem-sys = "1.1"
+vigem-sys = { path = "./vigem-sys", version = "1.1" }
 
 [profile.release]
 lto = true
 
 [profile.dev]
 codegen-units = 3
-
